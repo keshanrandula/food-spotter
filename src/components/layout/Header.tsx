@@ -1,7 +1,22 @@
 'use client';
 
 import React, { useState } from 'react';
-import { UtensilsCrossed, Plus, User, Sun, Moon, LayoutGrid, Map, X, Send, Utensils } from 'lucide-react';
+import { 
+  UtensilsCrossed, 
+  Plus, 
+  User, 
+  Sun, 
+  Moon, 
+  LayoutGrid, 
+  Map, 
+  X, 
+  Send, 
+  Utensils, 
+  Image as ImageIcon, 
+  Info, 
+  Bookmark, 
+  Compass 
+} from 'lucide-react';
 import { useTheme } from '../ThemeProvider';
 
 interface HeaderProps {
@@ -11,8 +26,8 @@ interface HeaderProps {
   onToggleView?: () => void;
   activeNav?: string;
   onNavigateDiscover?: () => void;
-  onNavigateCuisines?: () => void;
-  onNavigateCurated?: () => void;
+  onNavigateGallery?: () => void;
+  onNavigateAbout?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -22,8 +37,8 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleView,
   activeNav = 'discover',
   onNavigateDiscover,
-  onNavigateCuisines,
-  onNavigateCurated,
+  onNavigateGallery,
+  onNavigateAbout,
 }) => {
   const { theme, toggleTheme } = useTheme();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -40,8 +55,32 @@ export const Header: React.FC<HeaderProps> = ({
     }, 2000);
   };
 
-  const nb = 'px-4 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer';
-  const nbActive = 'bg-savor-600 text-white shadow-sm';
+  const handleDiscoverClick = () => {
+    if (onNavigateDiscover) {
+      onNavigateDiscover();
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const handleGalleryClick = () => {
+    if (onNavigateGallery) {
+      onNavigateGallery();
+    } else {
+      document.getElementById('gallery-section')?.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const handleAboutClick = () => {
+    if (onNavigateAbout) {
+      onNavigateAbout();
+    } else {
+      document.getElementById('about-section')?.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const nb = 'px-4 py-2 rounded-full text-xs font-bold transition-all duration-200 cursor-pointer flex items-center gap-1.5';
+  const nbActive = 'bg-savor-600 text-white shadow-md shadow-savor-600/20';
   const nbInactive = 'text-stone-700 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white hover:bg-warm-200/50 dark:hover:bg-white/10';
 
   return (
@@ -51,23 +90,37 @@ export const Header: React.FC<HeaderProps> = ({
         style={{ backgroundColor: 'var(--header-bg)', borderColor: 'var(--header-border)' }}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          <button onClick={onNavigateDiscover} className="flex items-center gap-3 cursor-pointer group">
-            <div className="w-9 h-9 rounded-xl bg-savor-600 flex items-center justify-center shadow-md shadow-savor-600/20 text-white group-hover:bg-savor-700 transition-colors">
+          {/* Brand Logo */}
+          <button onClick={handleDiscoverClick} className="flex items-center gap-3 cursor-pointer group">
+            <div className="w-10 h-10 rounded-2xl bg-savor-600 flex items-center justify-center shadow-md shadow-savor-600/25 text-white group-hover:scale-105 group-hover:bg-savor-700 transition-all">
               <UtensilsCrossed size={20} />
             </div>
             <span className="text-2xl font-bold tracking-tight text-stone-900 dark:text-stone-100 font-serif">
-              Savor<span className="font-sans font-extrabold text-savor-600">AI</span>
+              Food<span className="font-sans font-extrabold text-savor-600">Spotter</span>
             </span>
           </button>
 
-          <nav className="hidden md:flex items-center gap-1.5 bg-warm-100/80 dark:bg-white/5 p-1.5 rounded-full border border-warm-200/60 dark:border-white/10">
-            <button onClick={onNavigateDiscover} className={`${nb} ${activeNav === 'discover' ? nbActive : nbInactive}`}>Discover</button>
-            <button onClick={onNavigateCuisines} className={`${nb} ${activeNav === 'cuisines' ? nbActive : nbInactive}`}>Cuisines</button>
-            <button onClick={onNavigateCurated} className={`${nb} ${activeNav === 'curated' ? nbActive : nbInactive}`}>Curated Lists</button>
-            <button onClick={onOpenSavedModal} className={`${nb} ${activeNav === 'saved' ? nbActive : nbInactive} flex items-center gap-1.5`}>
-              Saved Spots
+          {/* Navigation: Discover | Gallery | About Us | Saved Spots */}
+          <nav className="hidden md:flex items-center gap-1 bg-warm-100/80 dark:bg-white/5 p-1.5 rounded-full border border-warm-200/60 dark:border-white/10">
+            <button onClick={handleDiscoverClick} className={`${nb} ${activeNav === 'discover' ? nbActive : nbInactive}`}>
+              <Compass size={14} />
+              <span>Discover</span>
+            </button>
+            <button onClick={handleGalleryClick} className={`${nb} ${activeNav === 'gallery' ? nbActive : nbInactive}`}>
+              <ImageIcon size={14} />
+              <span>Gallery</span>
+            </button>
+            <button onClick={handleAboutClick} className={`${nb} ${activeNav === 'about' ? nbActive : nbInactive}`}>
+              <Info size={14} />
+              <span>About Us</span>
+            </button>
+            <button onClick={onOpenSavedModal} className={`${nb} ${activeNav === 'saved' ? nbActive : nbInactive}`}>
+              <Bookmark size={14} />
+              <span>Saved Spots</span>
               {savedCount > 0 && (
-                <span className="w-4 h-4 rounded-full bg-savor-600 text-white text-[10px] font-bold flex items-center justify-center">{savedCount}</span>
+                <span className="ml-1 w-4 h-4 rounded-full bg-savor-600 text-white text-[10px] font-bold flex items-center justify-center">
+                  {savedCount}
+                </span>
               )}
             </button>
           </nav>
@@ -82,7 +135,7 @@ export const Header: React.FC<HeaderProps> = ({
             <button onClick={toggleTheme} className="w-9 h-9 rounded-full flex items-center justify-center transition-all cursor-pointer border bg-warm-100 dark:bg-white/5 hover:bg-warm-200 dark:hover:bg-white/10 text-stone-700 dark:text-stone-200 border-warm-200 dark:border-white/10">
               {theme === 'dark' ? <Sun size={16} className="text-amber-400" /> : <Moon size={16} />}
             </button>
-            <button onClick={() => setIsAddModalOpen(true)} className="px-4 py-2.5 rounded-full text-xs font-semibold bg-savor-600 hover:bg-savor-700 text-white shadow-md shadow-savor-600/20 flex items-center gap-1.5 transition-all cursor-pointer">
+            <button onClick={() => setIsAddModalOpen(true)} className="px-4 py-2.5 rounded-full text-xs font-bold bg-savor-600 hover:bg-savor-700 text-white shadow-md shadow-savor-600/20 flex items-center gap-1.5 transition-all cursor-pointer">
               <Plus size={14} /> <span className="hidden sm:inline">Add Restaurant</span>
             </button>
             <button className="w-9 h-9 rounded-full bg-warm-200/80 dark:bg-white/5 hover:bg-warm-300 dark:hover:bg-white/10 text-stone-700 dark:text-stone-300 flex items-center justify-center transition-colors cursor-pointer border border-warm-300/60 dark:border-white/10">

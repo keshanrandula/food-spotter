@@ -13,6 +13,8 @@ import { NeuralSearchBanner } from '@/components/restaurant/NeuralSearchBanner';
 import { ChefAiChatbot } from '@/components/restaurant/ChefAiChatbot';
 import { RestaurantMap } from '@/components/restaurant/RestaurantMap';
 import { PhotoGalleryModal } from '@/components/restaurant/PhotoGalleryModal';
+import { GallerySection } from '@/components/restaurant/GallerySection';
+import { AboutUsSection } from '@/components/restaurant/AboutUsSection';
 import { geocodeLocationClient, fetchOsmRestaurantsClient } from '@/services/osmClient';
 import { useScrollReveal } from '@/hooks/useScrollReveal';
 
@@ -31,6 +33,7 @@ export default function HomePage() {
 
   // View mode: grid or map
   const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid');
+  const [activeNav, setActiveNav] = useState<string>('discover');
 
   // Photo gallery lightbox state
   const [galleryPhotos, setGalleryPhotos] = useState<string[]>([]);
@@ -138,7 +141,6 @@ export default function HomePage() {
       // Got real OSM data — enrich with AI summaries
       setDataSource('osm');
       const enriched = await enrichWithAi(osmResults);
-      // Apply client-side filters
       let filtered = enriched;
       if (committedFilters.minRating > 0) filtered = filtered.filter(r => r.rating >= committedFilters.minRating);
       if (committedFilters.priceLevels.length > 0) filtered = filtered.filter(r => committedFilters.priceLevels.includes(r.priceLevel));
@@ -148,7 +150,7 @@ export default function HomePage() {
       return;
     }
 
-    // 3. Fall back to server-side /api/places GET (uses curated dataset)
+    // 3. Fall back to server-side /api/places GET
     setDataSource('server');
     try {
       const queryParams = new URLSearchParams({
@@ -254,19 +256,15 @@ export default function HomePage() {
 
   const isRestaurantSaved = (id: string) => savedItems.some(item => item.placeId === id);
 
-  // Submit handler: commit draft filters and trigger search
   const handleSearchSubmit = (newFilters: SearchFilters) => {
     setFilters(newFilters);
     setCommittedFilters(newFilters);
   };
 
-  // Reset: clear both draft and committed filters
   const handleResetFilters = () => {
     setFilters(defaultSearchFilters);
     setCommittedFilters(defaultSearchFilters);
   };
-
-  const [activeNav, setActiveNav] = useState<string>('discover');
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground font-sans">
@@ -278,15 +276,15 @@ export default function HomePage() {
         activeNav={activeNav}
         onNavigateDiscover={() => {
           setActiveNav('discover');
-          document.getElementById('hero-section')?.scrollIntoView({ behavior: 'smooth' });
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
-        onNavigateCuisines={() => {
-          setActiveNav('cuisines');
-          document.getElementById('filter-section')?.scrollIntoView({ behavior: 'smooth' });
+        onNavigateGallery={() => {
+          setActiveNav('gallery');
+          document.getElementById('gallery-section')?.scrollIntoView({ behavior: 'smooth' });
         }}
-        onNavigateCurated={() => {
-          setActiveNav('curated');
-          document.getElementById('curated-section')?.scrollIntoView({ behavior: 'smooth' });
+        onNavigateAbout={() => {
+          setActiveNav('about');
+          document.getElementById('about-section')?.scrollIntoView({ behavior: 'smooth' });
         }}
       />
 
@@ -363,9 +361,9 @@ export default function HomePage() {
       </section>
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-12">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-16">
 
-        {/* Data source status badge + section header */}
+        {/* Data source status badge */}
         {!isLoading && (
           <div
             ref={listingHeader.ref}
@@ -405,7 +403,6 @@ export default function HomePage() {
             </button>
           </div>
         ) : viewMode === 'map' ? (
-          /* MAP VIEW */
           <RestaurantMap
             restaurants={restaurants}
             selectedRestaurant={selectedRestaurant}
@@ -416,7 +413,6 @@ export default function HomePage() {
             onSummarizeAi={handleOpenAiModal}
           />
         ) : (
-          /* GRID VIEW */
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {restaurants.map((restaurant, idx) => (
               <div
@@ -442,9 +438,8 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* NEURAL SEARCH BANNER */}
+        {/* NEURAL SEARCH PROMPT BANNER */}
         <div
-          id="curated-section"
           ref={neuralBanner.ref}
           className={`reveal-zoom ${neuralBanner.isVisible ? 'reveal-visible' : ''}`}
         >
@@ -457,6 +452,12 @@ export default function HomePage() {
             }}
           />
         </div>
+
+        {/* INTERACTIVE ANIMATED GALLERY */}
+        <GallerySection onOpenLightbox={openGallery} />
+
+        {/* ABOUT US SECTION */}
+        <AboutUsSection />
       </main>
 
       <Footer />

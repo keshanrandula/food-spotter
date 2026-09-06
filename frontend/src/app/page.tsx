@@ -10,6 +10,9 @@ import { RestaurantCard } from '@/components/restaurant/RestaurantCard';
 import { RestaurantDetailModal } from '@/components/restaurant/RestaurantDetailModal';
 import { SavedModal } from '@/components/restaurant/SavedModal';
 import { NeuralSearchBanner } from '@/components/restaurant/NeuralSearchBanner';
+import { GallerySection } from '@/components/restaurant/GallerySection';
+import { AboutUsSection } from '@/components/restaurant/AboutUsSection';
+import { PhotoGalleryModal } from '@/components/restaurant/PhotoGalleryModal';
 import { getSavedPlaces, savePlace, deleteSavedPlace, getPlaces } from '@/services/api';
 import { searchRestaurants } from '@/services/googleApi';
 
@@ -29,19 +32,33 @@ export default function HomePage() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [savedItems, setSavedItems] = useState<SavedRestaurant[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  // locationReady prevents the first fetch from running before geolocation resolves/rejects
   const [locationReady, setLocationReady] = useState<boolean>(false);
   const [locationDenied, setLocationDenied] = useState<boolean>(false);
 
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState<boolean>(false);
   const [isLoadingAi, setIsLoadingAi] = useState<boolean>(false);
-
   const [isSavedModalOpen, setIsSavedModalOpen] = useState<boolean>(false);
+
+  // Active navigation tab
+  const [activeNav, setActiveNav] = useState<string>('discover');
+
+  // Photo Gallery Lightbox state
+  const [galleryPhotos, setGalleryPhotos] = useState<string[]>([]);
+  const [galleryTitle, setGalleryTitle] = useState<string>('');
+  const [galleryIndex, setGalleryIndex] = useState<number>(0);
+  const [isGalleryOpen, setIsGalleryOpen] = useState<boolean>(false);
+
+  const openLightbox = (photos: string[], title: string, startIndex = 0) => {
+    setGalleryPhotos(photos);
+    setGalleryTitle(title);
+    setGalleryIndex(startIndex);
+    setIsGalleryOpen(true);
+  };
 
   const [filters, setFilters] = useState<SearchFilters>(DEFAULT_FILTERS);
 
-  // Request geolocation once on mount; set locationReady when we know either way
+  // Request geolocation once on mount
   useEffect(() => {
     if (typeof window !== 'undefined' && 'geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
@@ -55,14 +72,12 @@ export default function HomePage() {
           setLocationReady(true);
         },
         () => {
-          // Permission denied or unavailable – fall back to default Colombo
           setLocationDenied(true);
           setLocationReady(true);
         },
         { timeout: 6000 }
       );
     } else {
-      // Geolocation not supported – proceed with defaults
       setLocationReady(true);
     }
   }, []);
@@ -87,10 +102,8 @@ export default function HomePage() {
 
   const fetchPlaces = useCallback(async () => {
     setIsLoading(true);
-    // Try backend API first (uses Geoapify - real OSM data)
     let data = await getPlaces(filters);
     if (!data || data.length === 0) {
-      // Fallback: browser-side direct call
       data = await searchRestaurants(filters);
     }
     setRestaurants(data);
@@ -102,7 +115,6 @@ export default function HomePage() {
     setSavedItems(data);
   }, []);
 
-  // Only start fetching places once we know the user's location (or that it's unavailable)
   useEffect(() => {
     if (!locationReady) return;
     fetchPlaces();
@@ -168,11 +180,24 @@ export default function HomePage() {
     <div className="min-h-screen flex flex-col bg-background text-foreground font-sans">
       <Header
         savedCount={savedItems.length}
-        onOpenSavedModal={() => setIsSavedModalOpen(true)}
+        onOpenSavedModal={() => { setIsSavedModalOpen(true); setActiveNav('saved'); }}
+        activeNav={activeNav}
+        onNavigateDiscover={() => {
+          setActiveNav('discover');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onNavigateGallery={() => {
+          setActiveNav('gallery');
+          document.getElementById('gallery-section')?.scrollIntoView({ behavior: 'smooth' });
+        }}
+        onNavigateAbout={() => {
+          setActiveNav('about');
+          document.getElementById('about-section')?.scrollIntoView({ behavior: 'smooth' });
+        }}
       />
 
       {/* HERO SECTION */}
-      <section className="relative w-full bg-gradient-to-b from-stone-900 via-stone-900/90 to-background text-white pt-16 pb-24 px-4 sm:px-6 lg:px-8 overflow-hidden">
+      <section id="hero-section" className="relative w-full bg-gradient-to-b from-stone-900 via-stone-900/90 to-background text-white pt-16 pb-24 px-4 sm:px-6 lg:px-8 overflow-hidden">
         <div className="absolute inset-0 z-0 opacity-35 mix-blend-overlay">
           <img
             src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1600&auto=format&fit=crop&q=80"
@@ -252,7 +277,7 @@ export default function HomePage() {
       </section>
 
       {/* MAIN CONTENT AREA */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-12">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-16">
         {isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 py-8">
             {[1, 2, 3].map((n) => (
@@ -295,16 +320,24 @@ export default function HomePage() {
           </div>
         )}
 
+        {/* NEURAL SEARCH PROMPT BANNER */}
         <NeuralSearchBanner
           onSelectPrompt={(prompt) => {
             setFilters(prev => ({ ...prev, keyword: prompt }));
             window.scrollTo({ top: 300, behavior: 'smooth' });
           }}
         />
+
+        {/* INTERACTIVE ANIMATED GALLERY SECTION */}
+        <GallerySection onOpenLightbox={openLightbox} />
+
+        {/* ABOUT US SECTION */}
+        <AboutUsSection />
       </main>
 
       <Footer />
 
+      {/* RESTAURANT DETAIL MODAL */}
       <RestaurantDetailModal
         restaurant={selectedRestaurant}
         isOpen={isDetailOpen}
@@ -315,11 +348,21 @@ export default function HomePage() {
         isLoadingAi={isLoadingAi}
       />
 
+      {/* SAVED MODAL */}
       <SavedModal
         isOpen={isSavedModalOpen}
         onClose={() => setIsSavedModalOpen(false)}
         savedItems={savedItems}
         onRemoveSaved={handleRemoveSavedItem}
+      />
+
+      {/* PHOTO LIGHTBOX MODAL */}
+      <PhotoGalleryModal
+        photos={galleryPhotos}
+        restaurantName={galleryTitle}
+        isOpen={isGalleryOpen}
+        initialIndex={galleryIndex}
+        onClose={() => setIsGalleryOpen(false)}
       />
     </div>
   );
