@@ -18,6 +18,8 @@ interface RestaurantDetailModalProps {
   onToggleSave: (restaurant: Restaurant) => void;
   onGenerateAiSummary: (restaurant: Restaurant) => Promise<void>;
   isLoadingAi?: boolean;
+  onBookTable?: (restaurant: Restaurant) => void;
+  onOpenLiveRoute?: (restaurant: Restaurant) => void;
 }
 
 export const RestaurantDetailModal: React.FC<RestaurantDetailModalProps> = ({
@@ -28,14 +30,20 @@ export const RestaurantDetailModal: React.FC<RestaurantDetailModalProps> = ({
   onToggleSave,
   onGenerateAiSummary,
   isLoadingAi = false,
+  onBookTable,
+  onOpenLiveRoute,
 }) => {
   const [activeTab, setActiveTab] = useState<'info' | 'reviews' | 'ai'>('info');
 
   if (!restaurant) return null;
 
   const handleOpenMaps = () => {
-    const query = encodeURIComponent(`${restaurant.name} ${restaurant.address}`);
-    window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
+    if (onOpenLiveRoute) {
+      onOpenLiveRoute(restaurant);
+    } else {
+      const query = encodeURIComponent(`${restaurant.name} ${restaurant.address}`);
+      window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
+    }
   };
 
   return (
@@ -80,15 +88,28 @@ export const RestaurantDetailModal: React.FC<RestaurantDetailModalProps> = ({
               </h2>
             </div>
 
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={handleOpenMaps}
-              className="gap-1.5 self-start sm:self-auto shadow-lg"
-            >
-              <Navigation size={15} />
-              Get Directions
-            </Button>
+            <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+              {onBookTable && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => onBookTable(restaurant)}
+                  className="gap-1.5 shadow-lg bg-rose-600 hover:bg-rose-500"
+                >
+                  <Sparkles size={15} />
+                  Book Table
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleOpenMaps}
+                className="gap-1.5 shadow-lg bg-zinc-900/80 backdrop-blur-md"
+              >
+                <Navigation size={15} />
+                Live Route
+              </Button>
+            </div>
           </div>
         </div>
 

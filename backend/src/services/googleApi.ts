@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { calculateDistance } from '../utils/formatters';
+import { backendConfig } from '../config/env';
 
 
 export interface Review {
@@ -46,10 +47,9 @@ async function fetchGeoapifyRestaurants(
   keyword: string = 'restaurant',
   radius: number = 5000
 ): Promise<Restaurant[]> {
-  // Read at runtime (after dotenv.config() has run)
-  const GEOAPIFY_API_KEY = process.env.GEOAPIFY_API_KEY;
+  const GEOAPIFY_API_KEY = backendConfig.geoapifyApiKey;
   if (!GEOAPIFY_API_KEY) {
-    console.warn('[Geoapify] GEOAPIFY_API_KEY not set in environment');
+    console.warn('[Geoapify] GEOAPIFY_API_KEY not configured in environment');
     return [];
   }
 
@@ -153,9 +153,8 @@ async function fetchGoogleRestaurants(
   keyword: string = 'restaurant',
   radius: number = 5000
 ): Promise<Restaurant[]> {
-  // Read at runtime
-  const apiKey = process.env.GOOGLE_PLACES_API_KEY;
-  if (!apiKey || apiKey === 'YOUR_GOOGLE_PLACES_API_KEY_HERE') return [];
+  const apiKey = backendConfig.googlePlacesApiKey;
+  if (!apiKey) return [];
 
   try {
     const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=restaurant&keyword=${encodeURIComponent(keyword)}&key=${apiKey}`;
@@ -248,7 +247,7 @@ async function geocodeLocation(locationStr?: string): Promise<{ lat: number; lng
   }
 
   // Geoapify geocoding (reachable) - read key at runtime
-  const GEOAPIFY_API_KEY = process.env.GEOAPIFY_API_KEY;
+  const GEOAPIFY_API_KEY = backendConfig.geoapifyApiKey;
   if (GEOAPIFY_API_KEY) {
     try {
       const res = await axios.get(

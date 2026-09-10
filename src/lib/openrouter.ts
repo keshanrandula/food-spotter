@@ -1,3 +1,5 @@
+import { serverConfig } from '@/lib/env';
+
 export interface OpenRouterMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -8,11 +10,11 @@ export async function callOpenRouter(
   temperature = 0.7,
   responseFormat?: { type: 'json_object' }
 ): Promise<string> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  const model = process.env.OPENROUTER_MODEL || 'meta-llama/llama-3-8b-instruct:free';
+  const apiKey = serverConfig.openrouterApiKey;
+  const model = serverConfig.openrouterModel;
 
   if (!apiKey) {
-    throw new Error('OPENROUTER_API_KEY is not set');
+    throw new Error('OPENROUTER_API_KEY is not configured or is invalid');
   }
 
   const payload: Record<string, any> = {

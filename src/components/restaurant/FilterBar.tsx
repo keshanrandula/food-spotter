@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Search, MapPin, Compass, RotateCw } from 'lucide-react';
+import { Search, MapPin, Compass, RotateCw, Mic, Camera, Sparkles } from 'lucide-react';
 import { SearchFilters } from '@/types';
 
 interface FilterBarProps {
@@ -10,6 +10,8 @@ interface FilterBarProps {
   onSearchSubmit: (newFilters: SearchFilters) => void;
   onResetFilters: () => void;
   totalResults: number;
+  onOpenVoiceSearch?: () => void;
+  onOpenMenuScanner?: () => void;
 }
 
 const TRENDING_TAGS = [
@@ -34,30 +36,56 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   onSearchSubmit,
   onResetFilters,
   totalResults,
+  onOpenVoiceSearch,
+  onOpenMenuScanner,
 }) => {
   return (
     <div className="space-y-6">
       {/* FLOATING GLASS SEARCH BAR CONTAINER */}
-      <div className="bg-white/80 backdrop-blur-xl border border-white/60 p-3 sm:p-4 rounded-3xl shadow-xl max-w-4xl mx-auto space-y-3">
+      <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border border-white/60 dark:border-zinc-800 p-3 sm:p-4 rounded-3xl shadow-xl max-w-4xl mx-auto space-y-3">
         <form 
           onSubmit={(e) => {
             e.preventDefault();
             onSearchSubmit({ ...filters });
           }}
-          className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center"
+          className="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-center"
         >
-          {/* Keyword Search */}
+          {/* Keyword Search with embedded Voice & Scanner shortcuts */}
           <div className="relative md:col-span-6">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-stone-400">
               <Search size={18} />
             </div>
             <input
               type="text"
-              placeholder="Cuisine, signature dish, or vibe..."
+              placeholder="Cuisine, dish, or vibe..."
               value={filters.keyword}
               onChange={(e) => onFilterChange({ ...filters, keyword: e.target.value })}
-              className="w-full pl-11 pr-4 py-3.5 bg-stone-100/70 border border-stone-200/80 rounded-2xl text-xs sm:text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-savor-600/30"
+              className="w-full pl-11 pr-20 py-3.5 bg-stone-100/70 dark:bg-zinc-800/70 border border-stone-200/80 dark:border-zinc-700 rounded-2xl text-xs sm:text-sm text-stone-900 dark:text-stone-100 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-savor-600/30"
             />
+            
+            {/* Quick Action Icons inside Keyword Input: Voice & Menu OCR */}
+            <div className="absolute inset-y-0 right-0 pr-2 flex items-center gap-1">
+              {onOpenVoiceSearch && (
+                <button
+                  type="button"
+                  onClick={onOpenVoiceSearch}
+                  className="p-1.5 rounded-xl bg-savor-50 dark:bg-savor-950/40 text-savor-600 dark:text-savor-300 hover:bg-savor-600 hover:text-white transition cursor-pointer"
+                  title="Voice Search (සිංහල / English)"
+                >
+                  <Mic size={15} />
+                </button>
+              )}
+              {onOpenMenuScanner && (
+                <button
+                  type="button"
+                  onClick={onOpenMenuScanner}
+                  className="p-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-300 hover:bg-emerald-600 hover:text-white transition cursor-pointer"
+                  title="AI Menu / Dish Scanner"
+                >
+                  <Camera size={15} />
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Location Input */}
@@ -70,12 +98,12 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               placeholder="Colombo, Sri Lanka"
               value={filters.location}
               onChange={(e) => onFilterChange({ ...filters, location: e.target.value })}
-              className="w-full pl-11 pr-10 py-3.5 bg-stone-100/70 border border-stone-200/80 rounded-2xl text-xs sm:text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-savor-600/30"
+              className="w-full pl-11 pr-10 py-3.5 bg-stone-100/70 dark:bg-zinc-800/70 border border-stone-200/80 dark:border-zinc-700 rounded-2xl text-xs sm:text-sm text-stone-900 dark:text-stone-100 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-savor-600/30"
             />
             <button 
               type="button"
               onClick={onResetFilters}
-              className="absolute inset-y-0 right-0 pr-3 flex items-center text-stone-400 hover:text-stone-700 cursor-pointer"
+              className="absolute inset-y-0 right-0 pr-3 flex items-center text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 cursor-pointer"
               title="Reset location"
             >
               <RotateCw size={16} />

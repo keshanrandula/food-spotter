@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { callOpenRouter } from '@/lib/openrouter';
 import { Restaurant, RecommendedSpot, FoodPairing } from '@/types';
+import { serverConfig } from '@/lib/env';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
     }));
 
     // If OpenRouter API Key exists, try to call LLM
-    if (process.env.OPENROUTER_API_KEY) {
+    if (serverConfig.openrouterApiKey) {
       try {
         const systemMessage = `
 You are "Chef AI Concierge", an elite culinary concierge and food matching expert for a top restaurant discovery app in Sri Lanka & worldwide.

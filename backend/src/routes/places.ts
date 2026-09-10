@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { searchRestaurants } from '../services/googleApi';
-import { generateReviewSummary } from '../services/aiService';
+import { generateReviewSummary, summarizeReviews } from '../services/aiService';
 
 const router = Router();
 
@@ -15,20 +15,17 @@ router.get('/', async (req: Request, res: Response) => {
 
     const mergedPlaces = await Promise.all(
       places.map(async (p) => {
-        const reviewText = p.reviews.map(r => r.text).join(' ');
-        const aiReviewSummary = await generateReviewSummary(reviewText);
+        const top5Reviews = (p.reviews || []).slice(0, 5);
+        const reviewText = top5Reviews.map(r => r.text).join(' ');
+        const [aiReviewSummary, aiSummary] = await Promise.all([
+          generateReviewSummary(reviewText || p.name),
+          summarizeReviews(p.name, top5Reviews)
+        ]);
+
         return {
           ...p,
           aiReviewSummary,
-          aiSummary: {
-            overallSummary: aiReviewSummary,
-            pros: ['Authentic flavor profile with fresh ingredients', 'Attentive service staff'],
-            cons: ['Advance booking recommended during peak hours'],
-            mustTryDishes: [p.tags[0] || 'Chef Special Platter'],
-            ambiance: 'Warm & Inviting',
-            overallScore: 9.4,
-            sentimentBreakdown: { positive: 90, neutral: 7, negative: 3 }
-          }
+          aiSummary
         };
       })
     );

@@ -129,21 +129,21 @@ export const ChefAiChatbot: React.FC<ChefAiChatbotProps> = ({
   return (
     <>
       {/* FLOATING TRIGGER BUTTON */}
-      <div className="fixed bottom-6 right-6 z-50">
+      <div className="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-40">
         {!isOpen && (
           <button
             onClick={() => setIsOpen(true)}
-            className="group relative flex items-center gap-3 px-5 py-3.5 rounded-full bg-gradient-to-r from-savor-600 via-amber-500 to-savor-700 text-white shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-300 border border-amber-300/30"
+            className="group relative flex items-center gap-2 sm:gap-3 px-3.5 sm:px-5 py-2.5 sm:py-3.5 rounded-full bg-gradient-to-r from-savor-600 via-amber-500 to-savor-700 text-white shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-300 border border-amber-300/30 active:scale-95"
           >
-            <span className="relative flex h-3 w-3">
+            <span className="relative flex h-2.5 w-2.5 sm:h-3 sm:w-3">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-200 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-100"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 sm:h-3 sm:w-3 bg-amber-100"></span>
             </span>
 
-            <Bot size={22} className="text-amber-100 group-hover:rotate-12 transition-transform" />
-            <span className="font-bold text-sm tracking-wide text-white">Ask Chef AI</span>
+            <Bot size={20} className="text-amber-100 group-hover:rotate-12 transition-transform" />
+            <span className="font-bold text-xs sm:text-sm tracking-wide text-white">Ask Chef AI</span>
             
-            <span className="bg-white/20 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider backdrop-blur-sm">
+            <span className="bg-white/20 text-white text-[9px] sm:text-[10px] font-extrabold px-1.5 sm:px-2 py-0.5 rounded-full uppercase tracking-wider backdrop-blur-sm">
               NEW
             </span>
           </button>
@@ -152,9 +152,9 @@ export const ChefAiChatbot: React.FC<ChefAiChatbotProps> = ({
 
       {/* CHAT MODAL / DRAWER WINDOW */}
       {isOpen && (
-        <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 w-[92vw] sm:w-[460px] h-[640px] max-h-[85vh] bg-stone-900 text-white rounded-3xl shadow-2xl border border-stone-700/60 flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 duration-300">
+        <div className="fixed inset-x-2 bottom-2 sm:inset-auto sm:bottom-6 sm:right-6 z-50 w-auto sm:w-[460px] h-[86vh] sm:h-[640px] max-h-[92vh] bg-stone-900 text-white rounded-3xl shadow-2xl border border-stone-700/60 flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 duration-300">
           {/* HEADER */}
-          <div className="px-5 py-4 bg-gradient-to-r from-stone-950 via-stone-900 to-stone-950 border-b border-stone-800 flex items-center justify-between">
+          <div className="px-4 sm:px-5 py-3 sm:py-4 bg-gradient-to-r from-stone-950 via-stone-900 to-stone-950 border-b border-stone-800 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-savor-600 to-amber-400 p-0.5 flex items-center justify-center shadow-md">
                 <div className="w-full h-full bg-stone-900 rounded-[14px] flex items-center justify-center">

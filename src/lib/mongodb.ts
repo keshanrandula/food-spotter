@@ -1,6 +1,5 @@
 import mongoose from 'mongoose';
-
-const MONGODB_URI = process.env.MONGODB_URI;
+import { serverConfig } from '@/lib/env';
 
 interface MongooseCache {
   conn: typeof mongoose | null;
@@ -19,7 +18,7 @@ if (!global.mongooseCache) {
 }
 
 export async function connectToDatabase(): Promise<typeof mongoose | null> {
-  const mongodbUri = process.env.MONGODB_URI;
+  const mongodbUri = serverConfig.mongodbUri;
 
   if (!mongodbUri) {
     console.warn('⚠️ MONGODB_URI is not defined in environment variables. Operating in memory fallback mode.');

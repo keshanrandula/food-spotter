@@ -1,8 +1,14 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Sparkles, Compass, Star, Calendar, UtensilsCrossed } from 'lucide-react';
-import { Restaurant, SavedRestaurant, SearchFilters } from '@/types';
+import { Sparkles, Compass, Star, Calendar, UtensilsCrossed, Navigation, Bookmark, User } from 'lucide-react';
+import { 
+  Restaurant, 
+  SavedRestaurant, 
+  SearchFilters, 
+  UserProfile, 
+  TableReservation 
+} from '@/types';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { FilterBar } from '@/components/restaurant/FilterBar';
@@ -15,6 +21,13 @@ import { RestaurantMap } from '@/components/restaurant/RestaurantMap';
 import { PhotoGalleryModal } from '@/components/restaurant/PhotoGalleryModal';
 import { GallerySection } from '@/components/restaurant/GallerySection';
 import { AboutUsSection } from '@/components/restaurant/AboutUsSection';
+import { MenuScannerModal } from '@/components/restaurant/MenuScannerModal';
+import { VoiceSearchModal } from '@/components/restaurant/VoiceSearchModal';
+import { AuthModal } from '@/components/auth/AuthModal';
+import { TableBookingModal } from '@/components/restaurant/TableBookingModal';
+import { MyReservationsModal } from '@/components/restaurant/MyReservationsModal';
+import { RouteNavigationModal } from '@/components/restaurant/RouteNavigationModal';
+import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
 import { geocodeLocationClient, fetchOsmRestaurantsClient } from '@/services/osmClient';
 import { useScrollReveal } from '@/hooks/useScrollReveal';
 
@@ -23,13 +36,28 @@ type DataSource = 'osm' | 'server' | 'loading';
 export default function HomePage() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [savedItems, setSavedItems] = useState<SavedRestaurant[]>([]);
+  const [reservations, setReservations] = useState<TableReservation[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [dataSource, setDataSource] = useState<DataSource>('loading');
 
+  // Restaurant Detail & Lightbox state
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState<boolean>(false);
   const [isLoadingAi, setIsLoadingAi] = useState<boolean>(false);
+  
+  // Modals state
   const [isSavedModalOpen, setIsSavedModalOpen] = useState<boolean>(false);
+  const [isScannerOpen, setIsScannerOpen] = useState<boolean>(false);
+  const [isVoiceSearchOpen, setIsVoiceSearchOpen] = useState<boolean>(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState<boolean>(false);
+  const [bookingRestaurant, setBookingRestaurant] = useState<Restaurant | null>(null);
+  const [isReservationsModalOpen, setIsReservationsModalOpen] = useState<boolean>(false);
+  const [isNavOpen, setIsNavOpen] = useState<boolean>(false);
+  const [navRestaurant, setNavRestaurant] = useState<Restaurant | null>(null);
+
+  // User Profile
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
 
   // View mode: grid or map
   const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid');
@@ -72,6 +100,32 @@ export default function HomePage() {
   const listingHeader = useScrollReveal({ threshold: 0.1 });
   const neuralBanner  = useScrollReveal({ threshold: 0.1 });
 
+  // Initialize User from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('foodspotter_user');
+      if (stored) {
+        try {
+          setCurrentUser(JSON.parse(stored));
+        } catch (e) {
+          console.error('Failed to parse stored user:', e);
+        }
+      }
+    }
+  }, []);
+
+  // Fetch initial reservations
+  useEffect(() => {
+    fetch('/api/reservations')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.data)) {
+          setReservations(data.data);
+        }
+      })
+      .catch(e => console.warn('Failed to load reservations:', e));
+  }, []);
+
   // Get user's GPS location on first load
   useEffect(() => {
     if (typeof window !== 'undefined' && 'geolocation' in navigator) {
@@ -112,119 +166,121 @@ export default function HomePage() {
   /**
    * Main search: first tries client-side OSM, falls back to server-side /api/places GET.
    */
-  const fetchPlaces = useCallback(async () => {
+  const fetchPlaces = useCallback(async (searchFilters: SearchFilters) => {
     setIsLoading(true);
     setDataSource('loading');
 
-    let resolvedLat = committedFilters.userLat || 6.9271;
-    let resolvedLng = committedFilters.userLng || 79.8450;
+    const kw = searchFilters.keyword.trim();
+    const loc = searchFilters.location.trim();
+    const radiusMeters = Math.min((searchFilters.radius || 15) * 1000, 25000);
 
-    // 1. Client-side geocode the location string
-    if (committedFilters.location && committedFilters.location !== 'My Current Location') {
-      const geo = await geocodeLocationClient(committedFilters.location);
+    let lat = searchFilters.userLat;
+    let lng = searchFilters.userLng;
+
+    // If a text location is provided and coords are missing or location changed from GPS default
+    if (loc && (!lat || !lng || loc.toLowerCase() !== 'my current location')) {
+      const geo = await geocodeLocationClient(loc);
       if (geo) {
-        resolvedLat = geo.lat;
-        resolvedLng = geo.lng;
+        lat = geo.lat;
+        lng = geo.lng;
       }
     }
 
-    // 2. Try client-side OpenStreetMap Overpass fetch
-    const kw = committedFilters.keyword || committedFilters.cuisine || 'restaurant';
-    let osmResults: Restaurant[] = [];
-    try {
-      osmResults = await fetchOsmRestaurantsClient(resolvedLat, resolvedLng, kw, committedFilters.radius || 15);
-    } catch (e) {
-      console.warn('[OSM] Client fetch error:', e);
+    // Default to Colombo coordinates if still unavailable
+    if (!lat || !lng) {
+      lat = 6.9271;
+      lng = 79.8450;
     }
 
+    // 1. Try Client-side OpenStreetMap Overpass query
+    const osmResults = await fetchOsmRestaurantsClient(lat, lng, kw || '', searchFilters.radius || 15);
+
     if (osmResults.length > 0) {
-      // Got real OSM data — enrich with AI summaries
+      setRestaurants(osmResults);
       setDataSource('osm');
-      const enriched = await enrichWithAi(osmResults);
-      let filtered = enriched;
-      if (committedFilters.minRating > 0) filtered = filtered.filter(r => r.rating >= committedFilters.minRating);
-      if (committedFilters.priceLevels.length > 0) filtered = filtered.filter(r => committedFilters.priceLevels.includes(r.priceLevel));
-      if (committedFilters.openNow) filtered = filtered.filter(r => r.openNow);
-      setRestaurants(filtered);
       setIsLoading(false);
+
+      // Async AI enrichment in background
+      enrichWithAi(osmResults).then(enriched => {
+        setRestaurants(enriched);
+      });
       return;
     }
 
-    // 3. Fall back to server-side /api/places GET
-    setDataSource('server');
+    // 2. Server-side API fallback
     try {
-      const queryParams = new URLSearchParams({
+      const params = new URLSearchParams({
         keyword: kw,
-        location: committedFilters.location,
-        radius: committedFilters.radius.toString(),
-        minRating: committedFilters.minRating.toString(),
-        priceLevels: committedFilters.priceLevels.join(','),
-        cuisine: committedFilters.cuisine,
-        openNow: committedFilters.openNow.toString(),
-        lat: resolvedLat.toString(),
-        lng: resolvedLng.toString(),
+        location: loc || 'Colombo, Sri Lanka',
+        radius: (searchFilters.radius || 15).toString(),
+        minRating: (searchFilters.minRating || 0).toString(),
+        priceLevels: searchFilters.priceLevels.join(','),
+        cuisine: searchFilters.cuisine || '',
+        openNow: searchFilters.openNow ? 'true' : 'false',
+        lat: (lat ?? 6.9271).toString(),
+        lng: (lng ?? 79.8450).toString(),
       });
-      const res = await fetch(`/api/places?${queryParams.toString()}`);
+
+      const res = await fetch(`/api/places?${params.toString()}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      if (data.success && Array.isArray(data.data)) {
+
+      if (data.success && Array.isArray(data.data) && data.data.length > 0) {
         setRestaurants(data.data);
+        setDataSource('server');
+        return;
       }
-    } catch (err) {
-      console.error('Server-side fetch failed:', err);
+    } catch (serverErr) {
+      console.warn('Server fallback search failed:', serverErr);
     } finally {
       setIsLoading(false);
     }
-  }, [committedFilters, enrichWithAi]);
+  }, [enrichWithAi]);
 
-  // Fetch saved items
-  const fetchSaved = useCallback(async () => {
-    try {
-      const res = await fetch('/api/saved');
-      const data = await res.json();
-      if (data.success && Array.isArray(data.data)) setSavedItems(data.data);
-    } catch (err) {}
+  // Initial load
+  useEffect(() => {
+    fetchPlaces(committedFilters);
   }, []);
 
-  useEffect(() => { fetchPlaces(); }, [fetchPlaces]);
-  useEffect(() => { fetchSaved(); }, [fetchSaved]);
+  // Fetch saved places from database
+  useEffect(() => {
+    fetch('/api/saved')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.data)) {
+          setSavedItems(data.data);
+        }
+      })
+      .catch(e => console.warn('Failed to load saved places:', e));
+  }, []);
 
-  // Trigger AI Summary Generation for a restaurant
-  const handleGenerateAiSummary = async (restaurant: Restaurant) => {
-    setIsLoadingAi(true);
-    try {
-      const res = await fetch('/api/reviews', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ restaurantName: restaurant.name, reviews: restaurant.reviews }),
-      });
-      const data = await res.json();
-      if (data.success && data.data) {
-        const updated = { ...restaurant, aiSummary: data.data };
-        setSelectedRestaurant(updated);
-        setRestaurants(prev => prev.map(r => r.id === restaurant.id ? updated : r));
-      }
-    } catch (err) {
-      console.error('Failed to summarize reviews:', err);
-    } finally {
-      setIsLoadingAi(false);
-    }
+  const handleSearchSubmit = (committed: SearchFilters) => {
+    setCommittedFilters(committed);
+    fetchPlaces(committed);
   };
 
-  const handleOpenAiModal = async (restaurant: Restaurant) => {
-    setSelectedRestaurant(restaurant);
-    setIsDetailOpen(true);
-    if (!restaurant.aiSummary) {
-      await handleGenerateAiSummary(restaurant);
+  const handleResetFilters = () => {
+    setFilters(defaultSearchFilters);
+    setCommittedFilters(defaultSearchFilters);
+    fetchPlaces(defaultSearchFilters);
+  };
+
+  const handleRemoveSaved = async (placeId: string) => {
+    try {
+      const res = await fetch(`/api/saved?placeId=${placeId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        setSavedItems(prev => prev.filter(i => i.placeId !== placeId));
+      }
+    } catch (err) {
+      console.error('Failed to remove saved restaurant:', err);
     }
   };
 
   const handleToggleSave = async (restaurant: Restaurant) => {
-    const isAlreadySaved = savedItems.some(i => i.placeId === restaurant.id);
-    if (isAlreadySaved) {
-      try {
-        await fetch(`/api/saved?placeId=${restaurant.id}`, { method: 'DELETE' });
-        setSavedItems(prev => prev.filter(i => i.placeId !== restaurant.id));
-      } catch (err) {}
+    const isCurrentlySaved = savedItems.some(i => i.placeId === restaurant.id);
+    if (isCurrentlySaved) {
+      handleRemoveSaved(restaurant.id);
     } else {
       try {
         const res = await fetch('/api/saved', {
@@ -242,37 +298,101 @@ export default function HomePage() {
           }),
         });
         const data = await res.json();
-        if (data.success && data.data) setSavedItems(prev => [data.data, ...prev]);
-      } catch (err) {}
+        if (data.success && data.data) {
+          setSavedItems(prev => [data.data, ...prev]);
+        }
+      } catch (err) {
+        console.error('Failed to save restaurant:', err);
+      }
     }
   };
 
-  const handleRemoveSavedItem = async (placeId: string) => {
+  const handleGenerateAiSummary = async (restaurant: Restaurant) => {
+    setIsLoadingAi(true);
     try {
-      await fetch(`/api/saved?placeId=${placeId}`, { method: 'DELETE' });
-      setSavedItems(prev => prev.filter(i => i.placeId !== placeId));
-    } catch (err) {}
+      const res = await fetch('/api/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          restaurantName: restaurant.name,
+          reviews: restaurant.reviews,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        const updated = {
+          ...restaurant,
+          aiSummary: data.data,
+          aiReviewSummary: data.data.overallSummary,
+        };
+        setSelectedRestaurant(updated);
+        setRestaurants(prev => prev.map(r => r.id === restaurant.id ? updated : r));
+      }
+    } catch (err) {
+      console.error('AI summary generation failed:', err);
+    } finally {
+      setIsLoadingAi(false);
+    }
   };
 
-  const isRestaurantSaved = (id: string) => savedItems.some(item => item.placeId === id);
-
-  const handleSearchSubmit = (newFilters: SearchFilters) => {
-    setFilters(newFilters);
-    setCommittedFilters(newFilters);
+  const handleSelectRestaurant = (restaurant: Restaurant) => {
+    setSelectedRestaurant(restaurant);
+    setIsDetailOpen(true);
   };
 
-  const handleResetFilters = () => {
-    setFilters(defaultSearchFilters);
-    setCommittedFilters(defaultSearchFilters);
+  const handleOpenBooking = (restaurant: Restaurant) => {
+    setBookingRestaurant(restaurant);
+    setIsBookingModalOpen(true);
   };
+
+  const handleOpenNavigation = (restaurant: Restaurant) => {
+    setNavRestaurant(restaurant);
+    setIsNavOpen(true);
+  };
+
+  const handleCancelReservation = async (id: string) => {
+    try {
+      const res = await fetch(`/api/reservations?id=${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        setReservations(prev => prev.map(r => r.id === id ? { ...r, status: 'cancelled' } : r));
+      }
+    } catch (err) {
+      console.error('Failed to cancel reservation:', err);
+    }
+  };
+
+  const handleUserLogin = (user: UserProfile) => {
+    setCurrentUser(user);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('foodspotter_user', JSON.stringify(user));
+    }
+  };
+
+  const handleUserLogout = () => {
+    setCurrentUser(null);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('foodspotter_user');
+    }
+  };
+
+  // Filter restaurants based on client criteria
+  const displayedRestaurants = restaurants.filter(r => {
+    if (committedFilters.minRating > 0 && r.rating < committedFilters.minRating) return false;
+    if (committedFilters.priceLevels.length > 0 && !committedFilters.priceLevels.includes(r.priceLevel)) return false;
+    if (committedFilters.cuisine && r.cuisine.toLowerCase() !== committedFilters.cuisine.toLowerCase()) return false;
+    if (committedFilters.openNow && !r.openNow) return false;
+    return true;
+  });
 
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground font-sans">
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans selection:bg-rose-500 selection:text-white">
+      {/* Universal Header */}
       <Header
         savedCount={savedItems.length}
-        onOpenSavedModal={() => { setIsSavedModalOpen(true); setActiveNav('saved'); }}
+        onOpenSavedModal={() => setIsSavedModalOpen(true)}
         viewMode={viewMode}
-        onToggleView={() => setViewMode(v => v === 'grid' ? 'map' : 'grid')}
+        onToggleView={() => setViewMode(prev => prev === 'grid' ? 'map' : 'grid')}
         activeNav={activeNav}
         onNavigateDiscover={() => {
           setActiveNav('discover');
@@ -286,218 +406,279 @@ export default function HomePage() {
           setActiveNav('about');
           document.getElementById('about-section')?.scrollIntoView({ behavior: 'smooth' });
         }}
+        onOpenMenuScanner={() => setIsScannerOpen(true)}
+        onOpenVoiceSearch={() => setIsVoiceSearchOpen(true)}
+        currentUser={currentUser}
+        reservationsCount={reservations.filter(r => r.status === 'confirmed').length}
+        onOpenAuthModal={() => setIsAuthModalOpen(true)}
+        onOpenReservationsModal={() => setIsReservationsModalOpen(true)}
       />
 
-      {/* HERO SECTION */}
-      <section id="hero-section" className="relative w-full bg-gradient-to-b from-stone-900 via-stone-900/90 to-background text-white pt-16 pb-24 px-4 sm:px-6 lg:px-8 overflow-hidden">
-        <div className="absolute inset-0 z-0 opacity-35 mix-blend-overlay">
-          <img
-            src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1600&auto=format&fit=crop&q=80"
-            alt="Warm Dining Background"
-            className="w-full h-full object-cover"
-          />
-        </div>
-        <div className="absolute inset-0 bg-gradient-to-b from-stone-950/60 via-stone-950/40 to-background z-0" />
-
-        <div
-          ref={heroText.ref}
-          className={`relative z-10 max-w-5xl mx-auto text-center space-y-6 pt-4 reveal-fade-up ${heroText.isVisible ? 'reveal-visible' : ''}`}
-        >
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 border border-white/20 text-stone-200 text-xs font-semibold backdrop-blur-md">
-            <Sparkles size={14} className="text-savor-500" />
-            NEXT-GEN CULINARY DISCOVERY ENGINE
-          </div>
-
-          <h1 className="text-4xl sm:text-6xl font-extrabold text-white tracking-tight leading-tight font-serif">
-            Discover Exceptional Dining <br />
-            <span className="bg-gradient-to-r from-savor-500 via-amber-400 to-savor-600 bg-clip-text text-transparent">
-              Powered by AI
-            </span>
-          </h1>
-
-          <p className="text-sm sm:text-base text-stone-300 max-w-2xl mx-auto leading-relaxed">
-            Real-time restaurant discovery via OpenStreetMap & AI-powered review insights.
-          </p>
-
-          <div id="filter-section" className="pt-4">
-            <FilterBar
-              filters={filters}
-              onFilterChange={setFilters}
-              onSearchSubmit={handleSearchSubmit}
-              onResetFilters={handleResetFilters}
-              totalResults={restaurants.length}
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* METRICS STAT BANNER */}
-      <section
-        ref={statBanner.ref}
-        className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-10 relative z-20 w-full reveal-fade-up ${statBanner.isVisible ? 'reveal-visible' : ''}`}
-      >
-        <div className="bg-white dark:bg-zinc-900 border border-warm-200 dark:border-zinc-800 rounded-3xl p-6 sm:p-8 shadow-savor grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-          <div className="space-y-1 border-r border-warm-200/60 last:border-r-0">
-            <div className="text-2xl sm:text-3xl font-extrabold text-stone-900 font-serif">12,000+</div>
-            <div className="text-xs text-stone-500 font-medium">Curated Epicurean Spots</div>
-          </div>
-          <div className="space-y-1 border-r border-warm-200/60 last:border-r-0">
-            <div className="text-2xl sm:text-3xl font-extrabold text-stone-900 font-serif flex items-center justify-center gap-1">
-              4.8 <Star size={18} className="fill-amber-400 text-amber-400" />
+      {/* Main Container */}
+      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 pb-24 md:pb-8 space-y-12">
+        
+        {/* Hero & Search Area */}
+        <div ref={heroText.ref} className={`transition-all duration-700 ${heroText.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
+          <div className="text-center max-w-3xl mx-auto space-y-4 mb-8">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-bold uppercase tracking-wider">
+              <Sparkles size={14} className="animate-spin" style={{ animationDuration: '6s' }} />
+              AI-Powered Culinary Intelligence
             </div>
-            <div className="text-xs text-stone-500 font-medium">Community Verified Palates</div>
-          </div>
-          <div className="space-y-1 border-r border-warm-200/60 last:border-r-0">
-            <div className="text-2xl sm:text-3xl font-extrabold text-stone-900 font-serif">3.2M</div>
-            <div className="text-xs text-stone-500 font-medium">Dishes Analyzed by AI</div>
-          </div>
-          <div className="space-y-1">
-            <div className="text-2xl sm:text-3xl font-extrabold text-savor-600 font-serif flex items-center justify-center gap-1">
-              <Calendar size={22} className="text-savor-600" /> Instant
-            </div>
-            <div className="text-xs text-stone-500 font-medium">VIP Table Bookings</div>
-          </div>
-        </div>
-      </section>
-
-      {/* MAIN CONTENT */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-16">
-
-        {/* Data source status badge */}
-        {!isLoading && (
-          <div
-            ref={listingHeader.ref}
-            className={`flex items-center gap-2 reveal-fade-left ${listingHeader.isVisible ? 'reveal-visible' : ''}`}
-          >
-            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border ${dataSource === 'osm' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
-              <span className={`w-2 h-2 rounded-full ${dataSource === 'osm' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-400'}`} />
-              {dataSource === 'osm' ? '🗺️ Live OpenStreetMap Data — Real Places Near You' : '📚 Curated Restaurant Data'}
-            </span>
-            <span className="text-xs text-stone-400">{restaurants.length} results</span>
-          </div>
-        )}
-
-        {/* RESTAURANT LISTINGS */}
-        {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 py-8">
-            {[1, 2, 3].map((n) => (
-              <div key={n} className="h-96 rounded-3xl bg-white dark:bg-zinc-900 border border-warm-200 dark:border-zinc-800 animate-pulse p-4 space-y-4">
-                <div className="h-48 bg-stone-200 dark:bg-zinc-800 rounded-2xl" />
-                <div className="h-6 bg-stone-200 dark:bg-zinc-800 rounded w-3/4" />
-                <div className="h-4 bg-stone-200 dark:bg-zinc-800 rounded w-1/2" />
-              </div>
-            ))}
-          </div>
-        ) : restaurants.length === 0 ? (
-          <div className="p-12 text-center bg-white dark:bg-zinc-900 rounded-3xl border border-warm-200 dark:border-zinc-800 space-y-4 shadow-sm">
-            <UtensilsCrossed size={40} className="text-stone-400 mx-auto" />
-            <h3 className="text-lg font-bold text-stone-900 dark:text-stone-100 font-serif">No Culinary Matches Found</h3>
-            <p className="text-xs text-stone-500 dark:text-stone-400 max-w-sm mx-auto">
-              We couldn't find restaurants matching your search. Try a different city or keyword.
+            
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight font-serif text-white">
+              Discover & Book Exceptional Restaurants in Sri Lanka
+            </h1>
+            
+            <p className="text-sm sm:text-base text-zinc-400 leading-relaxed max-w-2xl mx-auto">
+              Real-time restaurant exploration, multilingual voice queries, instant menu OCR breakdown, live GPS routing, and VIP table reservations.
             </p>
-            <button
-              onClick={() => setFilters(defaultSearchFilters)}
-              className="px-4 py-2 rounded-full text-xs font-bold bg-savor-600 text-white shadow-sm"
-            >
-              Reset Search Filters
-            </button>
           </div>
-        ) : viewMode === 'map' ? (
-          <RestaurantMap
-            restaurants={restaurants}
-            selectedRestaurant={selectedRestaurant}
-            onSelectRestaurant={(rest) => {
-              setSelectedRestaurant(rest);
-              setIsDetailOpen(true);
-            }}
-            onSummarizeAi={handleOpenAiModal}
-          />
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {restaurants.map((restaurant, idx) => (
-              <div
-                key={restaurant.id}
-                style={{
-                  animation: `cardReveal 0.55s cubic-bezier(0.16, 1, 0.3, 1) both`,
-                  animationDelay: `${idx * 80}ms`,
-                }}
-              >
-                <RestaurantCard
-                  restaurant={restaurant}
-                  onSelect={(rest) => {
-                    setSelectedRestaurant(rest);
-                    setIsDetailOpen(true);
-                  }}
-                  onSummarizeAi={handleOpenAiModal}
-                  onToggleSave={handleToggleSave}
-                  isSaved={isRestaurantSaved(restaurant.id)}
-                  onOpenGallery={(photos, name, i) => openGallery(photos, name, i)}
-                />
-              </div>
-            ))}
-          </div>
-        )}
 
-        {/* NEURAL SEARCH PROMPT BANNER */}
-        <div
-          ref={neuralBanner.ref}
-          className={`reveal-zoom ${neuralBanner.isVisible ? 'reveal-visible' : ''}`}
-        >
+          {/* Filter Bar */}
+          <FilterBar
+            filters={filters}
+            onFilterChange={setFilters}
+            onSearchSubmit={handleSearchSubmit}
+            onResetFilters={handleResetFilters}
+            totalResults={displayedRestaurants.length}
+            onOpenVoiceSearch={() => setIsVoiceSearchOpen(true)}
+            onOpenMenuScanner={() => setIsScannerOpen(true)}
+          />
+        </div>
+
+        {/* Neural Smart Search Quick Banner */}
+        <div ref={neuralBanner.ref} className={`transition-all duration-700 delay-100 ${neuralBanner.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
           <NeuralSearchBanner
-            onSelectPrompt={(prompt) => {
-              const updated = { ...filters, keyword: prompt };
+            onSelectPrompt={(query: string) => {
+              const updated = { ...committedFilters, keyword: query };
               setFilters(updated);
               setCommittedFilters(updated);
-              window.scrollTo({ top: 300, behavior: 'smooth' });
+              fetchPlaces(updated);
             }}
           />
         </div>
 
-        {/* INTERACTIVE ANIMATED GALLERY */}
-        <GallerySection onOpenLightbox={openGallery} />
+        {/* Dynamic View: Map vs Grid */}
+        <section className="space-y-6">
+          <div ref={listingHeader.ref} className="flex items-center justify-between flex-wrap gap-4 border-b border-zinc-800 pb-4">
+            <div>
+              <div className="flex items-center gap-2.5">
+                <h2 className="text-2xl font-bold font-serif text-zinc-100">
+                  {committedFilters.keyword ? `Search Results for "${committedFilters.keyword}"` : 'Curated Dining Spots'}
+                </h2>
+                <span className="px-3 py-1 rounded-full bg-zinc-800 text-rose-400 text-xs font-extrabold border border-zinc-700">
+                  {displayedRestaurants.length} Places Found
+                </span>
+              </div>
+              <p className="text-xs text-zinc-400 mt-1">
+                Near {committedFilters.location} • Sorted by distance & culinary rating
+              </p>
+            </div>
 
-        {/* ABOUT US SECTION */}
+            {/* View Toggle Buttons */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  viewMode === 'grid'
+                    ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
+                    : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-400 border border-zinc-800'
+                }`}
+              >
+                Grid View
+              </button>
+              <button
+                onClick={() => setViewMode('map')}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  viewMode === 'map'
+                    ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
+                    : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-400 border border-zinc-800'
+                }`}
+              >
+                Interactive Map
+              </button>
+            </div>
+          </div>
+
+          {/* Main Display: Map or Grid */}
+          {isLoading ? (
+            <div className="py-24 text-center space-y-4">
+              <div className="w-12 h-12 border-4 border-rose-500/20 border-t-rose-500 rounded-full animate-spin mx-auto" />
+              <h3 className="text-base font-bold text-zinc-300">Discovering Dining Gems...</h3>
+              <p className="text-xs text-zinc-500">Querying real-time geo-coordinates and sentiment scores</p>
+            </div>
+          ) : viewMode === 'map' ? (
+            <RestaurantMap
+              restaurants={displayedRestaurants}
+              selectedRestaurant={selectedRestaurant}
+              onSelectRestaurant={handleSelectRestaurant}
+              onSummarizeAi={handleGenerateAiSummary}
+            />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {displayedRestaurants.map((restaurant) => (
+                <RestaurantCard
+                  key={restaurant.id}
+                  restaurant={restaurant}
+                  isSaved={savedItems.some(i => i.placeId === restaurant.id)}
+                  onToggleSave={handleToggleSave}
+                  onSelect={handleSelectRestaurant}
+                  onSummarizeAi={handleGenerateAiSummary}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Visual Culinary Gallery */}
+        <GallerySection
+          onOpenLightbox={openGallery}
+        />
+
+        {/* About Platform */}
         <AboutUsSection />
+
       </main>
 
+      {/* Universal Footer */}
       <Footer />
 
-      {/* DETAIL MODAL */}
+      {/* --- ALL POPUPS & MODALS --- */}
+
+      {/* 1. Restaurant Details Modal */}
       <RestaurantDetailModal
         restaurant={selectedRestaurant}
         isOpen={isDetailOpen}
         onClose={() => setIsDetailOpen(false)}
-        isSaved={selectedRestaurant ? isRestaurantSaved(selectedRestaurant.id) : false}
+        isSaved={selectedRestaurant ? savedItems.some(i => i.placeId === selectedRestaurant.id) : false}
         onToggleSave={handleToggleSave}
         onGenerateAiSummary={handleGenerateAiSummary}
         isLoadingAi={isLoadingAi}
+        onBookTable={(r) => {
+          setIsDetailOpen(false);
+          handleOpenBooking(r);
+        }}
+        onOpenLiveRoute={(r) => {
+          setIsDetailOpen(false);
+          handleOpenNavigation(r);
+        }}
       />
 
-      {/* SAVED MODAL */}
+      {/* 2. VIP Table Booking & Pre-Order Modal */}
+      <TableBookingModal
+        isOpen={isBookingModalOpen}
+        onClose={() => setIsBookingModalOpen(false)}
+        restaurant={bookingRestaurant}
+        currentUser={currentUser}
+        onBookingSuccess={(newRes) => {
+          setReservations(prev => [newRes, ...prev]);
+        }}
+      />
+
+      {/* 3. My Reservations History Modal */}
+      <MyReservationsModal
+        isOpen={isReservationsModalOpen}
+        onClose={() => setIsReservationsModalOpen(false)}
+        currentUser={currentUser}
+        reservations={reservations}
+        onCancelReservation={handleCancelReservation}
+      />
+
+      {/* 4. Live GPS Turn-by-Turn Navigation Modal */}
+      <RouteNavigationModal
+        isOpen={isNavOpen}
+        onClose={() => setIsNavOpen(false)}
+        restaurant={navRestaurant}
+        userLat={committedFilters.userLat}
+        userLng={committedFilters.userLng}
+        userLocationName={committedFilters.location}
+      />
+
+      {/* 5. Saved Places & Wishlist Modal */}
       <SavedModal
         isOpen={isSavedModalOpen}
         onClose={() => setIsSavedModalOpen(false)}
         savedItems={savedItems}
-        onRemoveSaved={handleRemoveSavedItem}
+        onRemoveSaved={handleRemoveSaved}
       />
 
-      {/* CHEF AI CHATBOT */}
-      <ChefAiChatbot
-        restaurants={restaurants}
-        onSelectRestaurant={(rest) => {
-          setSelectedRestaurant(rest);
-          setIsDetailOpen(true);
+      {/* 6. AI Vision Menu Scanner Modal */}
+      <MenuScannerModal
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onFindDishNearMe={(dishName: string) => {
+          setIsScannerOpen(false);
+          const updated = { ...committedFilters, keyword: dishName };
+          setFilters(updated);
+          setCommittedFilters(updated);
+          fetchPlaces(updated);
         }}
       />
 
-      {/* PHOTO GALLERY LIGHTBOX */}
+      {/* 7. Sinhala / Singlish Multilingual Voice Query Modal */}
+      <VoiceSearchModal
+        isOpen={isVoiceSearchOpen}
+        onClose={() => setIsVoiceSearchOpen(false)}
+        onApplyVoiceSearch={(res) => {
+          const updated: SearchFilters = {
+            ...filters,
+            keyword: res.keyword || filters.keyword,
+            location: res.location || filters.location,
+            cuisine: res.cuisine || filters.cuisine,
+          };
+          setFilters(updated);
+          setCommittedFilters(updated);
+          fetchPlaces(updated);
+        }}
+        onAskChefAi={(q) => {
+          setIsVoiceSearchOpen(false);
+          // Handled by Chef AI floating widget
+        }}
+      />
+
+      {/* 8. User Auth & Profile Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        currentUser={currentUser}
+        onLoginSuccess={handleUserLogin}
+        onLogout={handleUserLogout}
+      />
+
+      {/* 9. Lightbox Photo Gallery Modal */}
       <PhotoGalleryModal
         photos={galleryPhotos}
-        restaurantName={galleryRestaurantName}
-        isOpen={isGalleryOpen}
         initialIndex={galleryIndex}
+        isOpen={isGalleryOpen}
         onClose={() => setIsGalleryOpen(false)}
+        restaurantName={galleryRestaurantName}
       />
+
+      {/* 10. AI Chef Concierge Chatbot Floating Widget */}
+      <ChefAiChatbot
+        restaurants={restaurants}
+        onSelectRestaurant={handleSelectRestaurant}
+      />
+
+      {/* 11. Mobile Bottom Dock Navigation Bar */}
+      <MobileBottomNav
+        activeNav={activeNav}
+        onNavigateDiscover={() => {
+          setActiveNav('discover');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        viewMode={viewMode}
+        onToggleView={() => setViewMode(prev => prev === 'grid' ? 'map' : 'grid')}
+        onOpenVoiceSearch={() => setIsVoiceSearchOpen(true)}
+        onOpenMenuScanner={() => setIsScannerOpen(true)}
+        onOpenReservationsModal={() => setIsReservationsModalOpen(true)}
+        reservationsCount={reservations.filter(r => r.status === 'confirmed').length}
+        onOpenSavedModal={() => setIsSavedModalOpen(true)}
+        savedCount={savedItems.length}
+        onOpenAuthModal={() => setIsAuthModalOpen(true)}
+        currentUser={currentUser}
+      />
+
     </div>
   );
 }

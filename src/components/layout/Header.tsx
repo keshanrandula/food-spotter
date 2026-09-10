@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { 
   UtensilsCrossed, 
   Plus, 
@@ -15,9 +16,13 @@ import {
   Image as ImageIcon, 
   Info, 
   Bookmark, 
-  Compass 
+  Compass,
+  Camera,
+  Mic,
+  ShieldCheck
 } from 'lucide-react';
 import { useTheme } from '../ThemeProvider';
+import { UserProfile } from '@/types';
 
 interface HeaderProps {
   savedCount: number;
@@ -28,6 +33,12 @@ interface HeaderProps {
   onNavigateDiscover?: () => void;
   onNavigateGallery?: () => void;
   onNavigateAbout?: () => void;
+  onOpenMenuScanner?: () => void;
+  onOpenVoiceSearch?: () => void;
+  currentUser?: UserProfile | null;
+  reservationsCount?: number;
+  onOpenAuthModal?: () => void;
+  onOpenReservationsModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -39,6 +50,12 @@ export const Header: React.FC<HeaderProps> = ({
   onNavigateDiscover,
   onNavigateGallery,
   onNavigateAbout,
+  onOpenMenuScanner,
+  onOpenVoiceSearch,
+  currentUser,
+  reservationsCount = 0,
+  onOpenAuthModal,
+  onOpenReservationsModal,
 }) => {
   const { theme, toggleTheme } = useTheme();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -89,7 +106,7 @@ export const Header: React.FC<HeaderProps> = ({
         className="sticky top-0 z-50 w-full backdrop-blur-md border-b shadow-sm transition-all duration-300"
         style={{ backgroundColor: 'var(--header-bg)', borderColor: 'var(--header-border)' }}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between">
           {/* Brand Logo */}
           <button onClick={handleDiscoverClick} className="flex items-center gap-3 cursor-pointer group">
             <div className="w-10 h-10 rounded-2xl bg-savor-600 flex items-center justify-center shadow-md shadow-savor-600/25 text-white group-hover:scale-105 group-hover:bg-savor-700 transition-all">
@@ -125,21 +142,91 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           </nav>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {onOpenVoiceSearch && (
+              <button
+                onClick={onOpenVoiceSearch}
+                className="w-9 h-9 rounded-full flex items-center justify-center transition-all cursor-pointer border bg-savor-50 dark:bg-savor-950/40 hover:bg-savor-600 hover:text-white text-savor-700 dark:text-savor-300 border-savor-200 dark:border-savor-800"
+                title="Voice Search (සිංහල / English)"
+              >
+                <Mic size={16} />
+              </button>
+            )}
+            {onOpenMenuScanner && (
+              <button
+                onClick={onOpenMenuScanner}
+                className="w-9 h-9 rounded-full flex items-center justify-center transition-all cursor-pointer border bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-600 hover:text-white text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
+                title="AI Menu & Food Scanner"
+              >
+                <Camera size={16} />
+              </button>
+            )}
             {onToggleView && (
               <button onClick={onToggleView} className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold bg-warm-100 dark:bg-white/5 hover:bg-warm-200 dark:hover:bg-white/10 text-stone-700 dark:text-stone-300 border border-warm-200 dark:border-white/10 transition-all cursor-pointer">
                 {viewMode === 'grid' ? <Map size={15} /> : <LayoutGrid size={15} />}
                 <span className="hidden sm:inline">{viewMode === 'grid' ? 'Map View' : 'Grid View'}</span>
               </button>
             )}
+            {onOpenReservationsModal && (
+              <button
+                onClick={onOpenReservationsModal}
+                className="relative px-3 py-2 rounded-full text-xs font-bold bg-warm-100 dark:bg-white/5 hover:bg-warm-200 dark:hover:bg-white/10 text-stone-700 dark:text-stone-300 border border-warm-200 dark:border-white/10 transition-all flex items-center gap-1.5 cursor-pointer"
+                title="My VIP Table Bookings"
+              >
+                <UtensilsCrossed size={14} className="text-savor-600" />
+                <span className="hidden md:inline">Bookings</span>
+                {reservationsCount > 0 && (
+                  <span className="w-4 h-4 rounded-full bg-savor-600 text-white text-[10px] font-extrabold flex items-center justify-center">
+                    {reservationsCount}
+                  </span>
+                )}
+              </button>
+            )}
+
             <button onClick={toggleTheme} className="w-9 h-9 rounded-full flex items-center justify-center transition-all cursor-pointer border bg-warm-100 dark:bg-white/5 hover:bg-warm-200 dark:hover:bg-white/10 text-stone-700 dark:text-stone-200 border-warm-200 dark:border-white/10">
               {theme === 'dark' ? <Sun size={16} className="text-amber-400" /> : <Moon size={16} />}
             </button>
+
+            {onOpenAuthModal && (
+              <button
+                onClick={onOpenAuthModal}
+                className="flex items-center gap-2 p-1 pl-2 pr-3 rounded-full border border-warm-200 dark:border-white/10 bg-warm-100 dark:bg-white/5 hover:bg-warm-200 dark:hover:bg-white/10 transition-all cursor-pointer"
+                title={currentUser ? `Signed in as ${currentUser.name}` : 'Sign In'}
+              >
+                {currentUser ? (
+                  <>
+                    <img
+                      src={currentUser.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80'}
+                      alt={currentUser.name}
+                      className="w-7 h-7 rounded-full object-cover border border-savor-500"
+                    />
+                    <span className="text-xs font-bold text-stone-900 dark:text-stone-100 hidden sm:inline truncate max-w-[90px]">
+                      {currentUser.name.split(' ')[0]}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-7 h-7 rounded-full bg-stone-200 dark:bg-zinc-800 flex items-center justify-center text-stone-700 dark:text-stone-300">
+                      <User size={14} />
+                    </div>
+                    <span className="text-xs font-bold text-stone-900 dark:text-stone-100 hidden sm:inline">
+                      Sign In
+                    </span>
+                  </>
+                )}
+              </button>
+            )}
+
+            <Link
+              href="/admin"
+              className="px-3 py-2 rounded-full text-xs font-bold bg-stone-900 dark:bg-white text-white dark:text-stone-900 hover:bg-stone-800 dark:hover:bg-stone-100 transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+              title="Open Admin Dashboard"
+            >
+              <ShieldCheck size={14} className="text-savor-500" />
+              <span className="hidden lg:inline">Admin</span>
+            </Link>
             <button onClick={() => setIsAddModalOpen(true)} className="px-4 py-2.5 rounded-full text-xs font-bold bg-savor-600 hover:bg-savor-700 text-white shadow-md shadow-savor-600/20 flex items-center gap-1.5 transition-all cursor-pointer">
               <Plus size={14} /> <span className="hidden sm:inline">Add Restaurant</span>
-            </button>
-            <button className="w-9 h-9 rounded-full bg-warm-200/80 dark:bg-white/5 hover:bg-warm-300 dark:hover:bg-white/10 text-stone-700 dark:text-stone-300 flex items-center justify-center transition-colors cursor-pointer border border-warm-300/60 dark:border-white/10">
-              <User size={16} />
             </button>
           </div>
         </div>
