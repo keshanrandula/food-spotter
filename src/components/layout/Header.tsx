@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import Link from 'next/link';
 import { 
   UtensilsCrossed, 
   Plus, 
@@ -18,8 +17,7 @@ import {
   Bookmark, 
   Compass,
   Camera,
-  Mic,
-  ShieldCheck
+  Mic
 } from 'lucide-react';
 import { useTheme } from '../ThemeProvider';
 import { UserProfile } from '@/types';
@@ -217,14 +215,6 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            <Link
-              href="/admin"
-              className="px-3 py-2 rounded-full text-xs font-bold bg-stone-900 dark:bg-white text-white dark:text-stone-900 hover:bg-stone-800 dark:hover:bg-stone-100 transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
-              title="Open Admin Dashboard"
-            >
-              <ShieldCheck size={14} className="text-savor-500" />
-              <span className="hidden lg:inline">Admin</span>
-            </Link>
             <button onClick={() => setIsAddModalOpen(true)} className="px-4 py-2.5 rounded-full text-xs font-bold bg-savor-600 hover:bg-savor-700 text-white shadow-md shadow-savor-600/20 flex items-center gap-1.5 transition-all cursor-pointer">
               <Plus size={14} /> <span className="hidden sm:inline">Add Restaurant</span>
             </button>
