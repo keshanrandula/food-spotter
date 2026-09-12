@@ -192,22 +192,7 @@ export default function HomePage() {
       lng = 79.8450;
     }
 
-    // 1. Try Client-side OpenStreetMap Overpass query
-    const osmResults = await fetchOsmRestaurantsClient(lat, lng, kw || '', searchFilters.radius || 15);
-
-    if (osmResults.length > 0) {
-      setRestaurants(osmResults);
-      setDataSource('osm');
-      setIsLoading(false);
-
-      // Async AI enrichment in background
-      enrichWithAi(osmResults).then(enriched => {
-        setRestaurants(enriched);
-      });
-      return;
-    }
-
-    // 2. Server-side API fallback
+    // 1. Primary: Server-side API search (Geoapify, Google Places, or Curated Rich Database)
     try {
       const params = new URLSearchParams({
         keyword: kw,
@@ -222,16 +207,30 @@ export default function HomePage() {
       });
 
       const res = await fetch(`/api/places?${params.toString()}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-
-      if (data.success && Array.isArray(data.data) && data.data.length > 0) {
-        setRestaurants(data.data);
-        setDataSource('server');
-        return;
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.data) && data.data.length > 0) {
+          setRestaurants(data.data);
+          setDataSource('server');
+          setIsLoading(false);
+          return;
+        }
       }
     } catch (serverErr) {
-      console.warn('Server fallback search failed:', serverErr);
+      console.warn('Server search failed, trying client fallback:', serverErr);
+    }
+
+    // 2. Fallback: Client-side OpenStreetMap Overpass query
+    try {
+      const osmResults = await fetchOsmRestaurantsClient(lat, lng, kw || '', searchFilters.radius || 15);
+      if (osmResults.length > 0) {
+        setRestaurants(osmResults);
+        setDataSource('osm');
+        setIsLoading(false);
+        return;
+      }
+    } catch (clientErr) {
+      console.warn('Client OSM fallback failed:', clientErr);
     } finally {
       setIsLoading(false);
     }
@@ -643,6 +642,8 @@ export default function HomePage() {
         currentUser={currentUser}
         onLoginSuccess={handleUserLogin}
         onLogout={handleUserLogout}
+        onOpenSavedSpots={() => setIsSavedModalOpen(true)}
+        onOpenBookings={() => setIsReservationsModalOpen(true)}
       />
 
       {/* 9. Lightbox Photo Gallery Modal */}

@@ -66,11 +66,20 @@ export interface UserProfile {
   id: string;
   name: string;
   email: string;
+  phone?: string;
   avatarUrl?: string;
   bio?: string;
   badge?: string;
+  role?: string;
+  status?: 'active' | 'suspended' | 'banned';
   favoriteCuisines: string[];
   dietaryPreferences: string[];
+  savedPlaceIds?: string[];
+  stats?: {
+    savedCount?: number;
+    reviewsCount?: number;
+    bookingsCount?: number;
+  };
   createdAt: string;
 }
 

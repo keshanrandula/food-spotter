@@ -94,16 +94,14 @@ export async function fetchOsmRestaurantsClient(
   for (const mirror of OVERPASS_MIRRORS) {
     try {
       const url = `${mirror}?data=${encodeURIComponent(overpassQuery)}`;
-      console.log(`[OSM] Trying mirror: ${mirror}`);
-      const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+      const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
       if (!res.ok) continue;
       data = await res.json();
       if (data?.elements?.length >= 0) {
-        console.log(`[OSM] ✅ Success via ${mirror} — ${data.elements.length} elements`);
         break;
       }
     } catch (mirrorErr) {
-      console.warn(`[OSM] Mirror ${mirror} failed:`, mirrorErr);
+      // Mirror failed or timed out, try next
     }
   }
 
