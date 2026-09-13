@@ -8,10 +8,10 @@ on:
 
 jobs:
   # ----------------------------------------------------
-  # Job 1: Frontend (Next.js + TypeScript + ESLint)
+  # Job 1: Frontend (Next.js + TypeScript Type Check + Build)
   # ----------------------------------------------------
   frontend:
-    name: Frontend Lint & Build
+    name: Frontend TypeCheck & Build
     runs-on: ubuntu-latest
 
     steps:
@@ -27,8 +27,8 @@ jobs:
       - name: Install Frontend Dependencies
         run: npm ci
 
-      - name: Run ESLint
-        run: npm run lint
+      - name: Type Check with TypeScript
+        run: npx tsc --noEmit
 
       - name: Build Next.js Application
         run: npm run build
