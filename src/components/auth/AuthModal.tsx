@@ -26,7 +26,12 @@ import {
   Check, 
   RefreshCw,
   Zap,
-  ArrowRight
+  ArrowRight,
+  Camera,
+  Upload,
+  Trash2,
+  Link2,
+  Image as ImageIcon
 } from 'lucide-react';
 import { UserProfile } from '@/types';
 
@@ -40,39 +45,8 @@ interface AuthModalProps {
   onOpenBookings?: () => void;
 }
 
-// Preset Avatars for Foodies
-const AVATAR_PRESETS = [
-  {
-    id: 'foodie_1',
-    label: 'Gourmet Critic',
-    url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'chef_2',
-    label: 'Master Chef',
-    url: 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=200&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'traveler_3',
-    label: 'Spice Hunter',
-    url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'connoisseur_4',
-    label: 'Dessert Lover',
-    url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'coffee_5',
-    label: 'Coffee Artisan',
-    url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'sushi_6',
-    label: 'Sushi Specialist',
-    url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80',
-  },
-];
+// Default Fallback Avatar
+const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80';
 
 const CUISINE_OPTIONS = [
   'Sri Lankan',
@@ -128,7 +102,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [phone, setPhone] = useState('');
   const [bio, setBio] = useState('');
   const [badge, setBadge] = useState('Epicurean Critic ★★★');
-  const [avatarUrl, setAvatarUrl] = useState(AVATAR_PRESETS[0].url);
+  const [avatarUrl, setAvatarUrl] = useState(DEFAULT_AVATAR);
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const [customUrl, setCustomUrl] = useState('');
   const [selectedCuisines, setSelectedCuisines] = useState<string[]>(['Sri Lankan', 'Seafood Specialist']);
   const [selectedDietary, setSelectedDietary] = useState<string[]>(['Halal Friendly']);
 
@@ -152,7 +128,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setPhone(currentUser.phone || '');
       setBio(currentUser.bio || '');
       setBadge(currentUser.badge || 'Epicurean Critic ★★★');
-      setAvatarUrl(currentUser.avatarUrl || AVATAR_PRESETS[0].url);
+      setAvatarUrl(currentUser.avatarUrl || DEFAULT_AVATAR);
       setSelectedCuisines(currentUser.favoriteCuisines || ['Sri Lankan']);
       setSelectedDietary(currentUser.dietaryPreferences || []);
     } else {
@@ -160,6 +136,58 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
     setStatusMsg(null);
   }, [currentUser, isOpen]);
+
+  // Handle Image File Upload (Compress to light Data URL)
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setStatusMsg({ type: 'error', text: 'Please select a valid image file (PNG, JPG, WebP).' });
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setStatusMsg({ type: 'error', text: 'Image file too large (Max 5MB).' });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_DIM = 400;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_DIM) {
+            height *= MAX_DIM / width;
+            width = MAX_DIM;
+          }
+        } else {
+          if (height > MAX_DIM) {
+            width *= MAX_DIM / height;
+            height = MAX_DIM;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          setAvatarUrl(dataUrl);
+          setStatusMsg({ type: 'success', text: 'Profile picture uploaded successfully! 📸' });
+          setTimeout(() => setStatusMsg(null), 2500);
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Calculate live password strength
   const getPasswordStrength = (pass: string) => {
@@ -545,29 +573,80 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               {/* Tab 1: Profile Details & Bio */}
               {profileTab === 'details' && (
                 <form onSubmit={handleUpdateProfile} className="space-y-4">
-                  {/* Current Avatar & Selector */}
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-zinc-300">Choose Foodie Avatar</label>
-                    <div className="flex items-center gap-3 p-3 bg-zinc-950 rounded-2xl border border-zinc-800 overflow-x-auto">
-                      {AVATAR_PRESETS.map((p) => (
+                  {/* Profile Photo Uploader */}
+                  <div className="space-y-2.5 p-3.5 bg-zinc-950 rounded-2xl border border-zinc-800">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
+                        <Camera size={14} className="text-rose-400" /> Profile Picture
+                      </label>
+                      {avatarUrl && avatarUrl !== DEFAULT_AVATAR && (
                         <button
-                          key={p.id}
                           type="button"
-                          onClick={() => setAvatarUrl(p.url)}
-                          className={`relative w-12 h-12 rounded-2xl overflow-hidden border-2 transition-all flex-shrink-0 cursor-pointer ${
-                            avatarUrl === p.url ? 'border-rose-500 scale-105 shadow-md shadow-rose-500/30' : 'border-zinc-800 opacity-60 hover:opacity-100'
-                          }`}
-                          title={p.label}
+                          onClick={() => setAvatarUrl(DEFAULT_AVATAR)}
+                          className="text-[11px] text-zinc-400 hover:text-rose-400 transition-colors flex items-center gap-1 cursor-pointer"
                         >
-                          <img src={p.url} alt={p.label} className="w-full h-full object-cover" />
-                          {avatarUrl === p.url && (
-                            <div className="absolute inset-0 bg-rose-600/30 flex items-center justify-center text-white">
-                              <Check size={14} className="stroke-[3]" />
-                            </div>
-                          )}
+                          <Trash2 size={11} /> Reset to Default
                         </button>
-                      ))}
+                      )}
                     </div>
+
+                    <div className="flex items-center gap-3.5">
+                      {/* Photo Preview & Quick Hover Upload */}
+                      <div className="relative group w-16 h-16 rounded-2xl overflow-hidden border-2 border-rose-500/60 bg-zinc-900 shadow-md shadow-rose-950/40 flex-shrink-0">
+                        <img src={avatarUrl || DEFAULT_AVATAR} alt="Profile Avatar" className="w-full h-full object-cover" />
+                        <label className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white cursor-pointer transition-opacity">
+                          <Camera size={18} />
+                          <span className="text-[9px] font-bold mt-0.5">Change</span>
+                          <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                        </label>
+                      </div>
+
+                      {/* Upload Controls */}
+                      <div className="flex-1 space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <label className="px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md shadow-rose-600/30 flex items-center gap-1.5 transition-all cursor-pointer">
+                            <Upload size={13} />
+                            <span>Upload Image</span>
+                            <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setShowUrlInput(!showUrlInput)}
+                            className="px-3 py-1.5 rounded-xl border border-zinc-800 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                          >
+                            <Link2 size={13} />
+                            <span>Paste Link</span>
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-zinc-500">Supports PNG, JPG, WebP directly from device</p>
+                      </div>
+                    </div>
+
+                    {/* Image URL Input Drawer */}
+                    {showUrlInput && (
+                      <div className="pt-2 flex items-center gap-2 border-t border-zinc-900">
+                        <input
+                          type="url"
+                          value={customUrl}
+                          onChange={(e) => setCustomUrl(e.target.value)}
+                          placeholder="https://example.com/photo.jpg"
+                          className="flex-1 px-3 py-2 rounded-xl border border-zinc-800 bg-zinc-900 text-xs text-zinc-200 focus:outline-none focus:border-rose-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (customUrl.trim()) {
+                              setAvatarUrl(customUrl.trim());
+                              setCustomUrl('');
+                              setShowUrlInput(false);
+                            }
+                          }}
+                          className="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold cursor-pointer"
+                        >
+                          Apply
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/* Name & Phone */}
@@ -968,27 +1047,35 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   {/* Registration specific fields */}
                   {authMode === 'register' && (
                     <>
-                      {/* Avatar Selector in Registration */}
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-zinc-300">Choose Avatar</label>
-                        <div className="flex items-center gap-2.5 p-2 bg-zinc-950 rounded-2xl border border-zinc-800 overflow-x-auto">
-                          {AVATAR_PRESETS.map((p) => (
-                            <button
-                              key={p.id}
-                              type="button"
-                              onClick={() => setAvatarUrl(p.url)}
-                              className={`relative w-10 h-10 rounded-xl overflow-hidden border-2 transition-all flex-shrink-0 cursor-pointer ${
-                                avatarUrl === p.url ? 'border-rose-500 scale-105 shadow-sm' : 'border-zinc-800 opacity-60 hover:opacity-100'
-                              }`}
-                            >
-                              <img src={p.url} alt={p.label} className="w-full h-full object-cover" />
-                              {avatarUrl === p.url && (
-                                <div className="absolute inset-0 bg-rose-600/30 flex items-center justify-center text-white">
-                                  <Check size={12} className="stroke-[3]" />
-                                </div>
-                              )}
-                            </button>
-                          ))}
+                      {/* Photo Uploader in Registration */}
+                      <div className="space-y-2 p-3 bg-zinc-950 rounded-2xl border border-zinc-800">
+                        <label className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
+                          <Camera size={13} className="text-rose-400" /> Profile Picture (Optional)
+                        </label>
+                        <div className="flex items-center gap-3">
+                          <div className="relative group w-12 h-12 rounded-xl overflow-hidden border border-rose-500/50 bg-zinc-900 flex-shrink-0">
+                            <img src={avatarUrl || DEFAULT_AVATAR} alt="Avatar Preview" className="w-full h-full object-cover" />
+                            <label className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white cursor-pointer transition-opacity">
+                              <Camera size={14} />
+                              <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                            </label>
+                          </div>
+                          <div className="flex-1 flex items-center gap-2">
+                            <label className="px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-800 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer">
+                              <Upload size={12} className="text-rose-400" />
+                              <span>Upload Photo</span>
+                              <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                            </label>
+                            {avatarUrl !== DEFAULT_AVATAR && (
+                              <button
+                                type="button"
+                                onClick={() => setAvatarUrl(DEFAULT_AVATAR)}
+                                className="text-[11px] text-zinc-400 hover:text-rose-400 cursor-pointer"
+                              >
+                                Reset
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
 
